@@ -75,20 +75,23 @@ def main():
         lr=lr
     )
     
+    # TensorBoard logger
+    logger = TensorBoardLogger(
+        save_dir="logs",
+        name="mlp_vqvae_rot"
+    )
+    
     # Save only the top-3 checkpoint
     checkpoint_callback = ModelCheckpoint(
         dirpath="checkpoints/",
-        filename="vqvae-{epoch:02d}-{val_loss:.4f}",
+        filename=f"{logger.name}-v{logger.version}" + "-{epoch:02d}-{val_loss:.4f}",
         monitor="val_loss",
         mode="min",
         save_top_k=3,        
         save_last=True       
     )
 
-    logger = TensorBoardLogger(
-        save_dir="logs",
-        name="mlp_vqvae"
-    )
+    
 
     # Initialize trainer
     trainer = pl.Trainer(

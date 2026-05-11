@@ -219,3 +219,9 @@ __marimo__/
 
 # PyTorch Lightning logs
 lightning_logs/
+
+# PyTorch Lightning checkpoints
+checkpoints/
+
+# TensorBoard logs
+logs/
