@@ -90,32 +90,28 @@ class L1TriggerDataset(IterableDataset):
 
         Handles multi-process loading by splitting files across workers.
         """
+
         worker_info = get_worker_info()
 
+        files = self.dataset.files
+
         if worker_info is None:
-            scanner = self.dataset.scanner(columns=self.features)
+            assigned_files = files
         else:
-            worker_id = worker_info.id
-            num_workers = worker_info.num_workers
-            files = self.dataset.files
-            files_per_worker = len(files) // num_workers
-            extra = len(files) % num_workers
+            assigned_files = files[worker_info.id::worker_info.num_workers]
 
-            start_idx = worker_id * files_per_worker + min(worker_id, extra)
-            end_idx = start_idx + files_per_worker + (1 if worker_id < extra else 0)
+        dataset = ds.dataset(assigned_files, format="parquet")
 
-            worker_files = files[start_idx:end_idx]
-            scanner = self.dataset.scanner(files=worker_files, columns=self.features)
+        scanner = dataset.scanner(
+            columns=self.features,
+            use_threads=True,
+        )
 
-        batch_reader = scanner.to_reader()
-
-        for batch in batch_reader:
+        for batch in scanner.to_batches():
             df = batch.to_pandas()
 
             for i in range(len(df)):
-                row = df.iloc[i]
-                features, mask = self._process_event(row)
-                yield features, mask
+                yield self._process_event(df.iloc[i])
 
 
 class L1TriggerDataModule(pl.LightningDataModule):
@@ -133,6 +129,7 @@ class L1TriggerDataModule(pl.LightningDataModule):
         num_workers: int = 0,
         features: List[str] = ["L1T_PUPPIPart_PT", "L1T_PUPPIPart_Eta", "L1T_PUPPIPart_Phi", "L1T_PUPPIPart_PuppiW"],
         puppiw_threshold: float = 0.05,
+        preprocessing: bool = True
     ):
         """
         Initialize the DataModule.
@@ -157,6 +154,7 @@ class L1TriggerDataModule(pl.LightningDataModule):
         self.num_workers = num_workers
         self.features = features
         self.puppiw_threshold = puppiw_threshold
+        self.preprocessing = preprocessing
 
     def train_dataloader(self):
         """Return training dataloader."""
@@ -165,6 +163,7 @@ class L1TriggerDataModule(pl.LightningDataModule):
             max_particles=self.max_particles,
             features=self.features,
             puppiw_threshold=self.puppiw_threshold,
+            preprocessing=self.preprocessing
         )
         return torch.utils.data.DataLoader(
             self.train_dataset,
@@ -181,6 +180,7 @@ class L1TriggerDataModule(pl.LightningDataModule):
             max_particles=self.max_particles,
             features=self.features,
             puppiw_threshold=self.puppiw_threshold,
+            preprocessing=self.preprocessing
         )
         return torch.utils.data.DataLoader(
             self.val_dataset,
@@ -197,6 +197,7 @@ class L1TriggerDataModule(pl.LightningDataModule):
             max_particles=self.max_particles,
             features=self.features,
             puppiw_threshold=self.puppiw_threshold,
+            preprocessing=self.preprocessing
         )
         return torch.utils.data.DataLoader(
             self.test_dataset,

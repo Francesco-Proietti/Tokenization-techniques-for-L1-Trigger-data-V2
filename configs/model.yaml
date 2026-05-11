@@ -2,9 +2,11 @@
 
 MLP_VQVAE:
   input_dim: 3
-  hidden_dim: 128
+  hidden_dim: 
+    - 64
+    - 128
   latent_dim: 256
-  codebook_size: 256
+  codebook_size: 512
   rotation_trick: True
   decay: 0.8
   beta: 0.25

@@ -149,13 +149,13 @@ class MLPVQVAE(pl.LightningModule):
         self.reconstruction_weight = reconstruction_weight
         self.lr = lr
 
-        encoder_hidden_dims = encoder_hidden_dims or hidden_dims
-        decoder_hidden_dims = decoder_hidden_dims or hidden_dims
-
+        self.encoder_hidden_dims = encoder_hidden_dims or hidden_dims
+        self.decoder_hidden_dims = decoder_hidden_dims or list(reversed(hidden_dims))
+        
         self.encoder = MLPEncoder(
-            input_dim=input_dim,
-            hidden_dims=encoder_hidden_dims,
-            embedding_dim=embedding_dim
+            input_dim=self.input_dim,
+            hidden_dims=self.encoder_hidden_dims,
+            embedding_dim=self.embedding_dim
         )
 
         # Vector Quantizer
@@ -168,9 +168,9 @@ class MLPVQVAE(pl.LightningModule):
         )
 
         self.decoder = MLPDecoder(
-            embedding_dim=embedding_dim,
-            hidden_dims=decoder_hidden_dims,
-            output_dim=input_dim
+            embedding_dim=self.embedding_dim,
+            hidden_dims=self.decoder_hidden_dims,
+            output_dim=self.input_dim
         )
 
     def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, dict]:
@@ -199,7 +199,7 @@ class MLPVQVAE(pl.LightningModule):
         # Decode
         x_recon_valid = self.decoder(z_q)
 
-        x_recon = torch.zeros(B, N, F)
+        x_recon = torch.zeros(B, N, F, device=x.device)
 
         x_recon[mask] = x_recon_valid    
 
