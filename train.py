@@ -7,6 +7,7 @@ import yaml
 
 import lightning as pl
 import torch
+from lightning.pytorch.callbacks import ModelCheckpoint
 
 from src.data.data_loading import L1TriggerDataset, L1TriggerDataModule
 from src.models.mlp_vqvae import MLPVQVAE
@@ -73,12 +74,22 @@ def main():
         lr=lr
     )
 
+    checkpoint_callback = ModelCheckpoint(
+        dirpath="checkpoints/",
+        filename="vqvae-{epoch:02d}-{val_loss:.4f}",
+        monitor="val_loss",
+        mode="min",
+        save_top_k=3,        
+        save_last=True       
+    )
+
     # Initialize trainer
     trainer = pl.Trainer(
         max_epochs=max_epochs,
         accelerator="auto",
         devices="auto",
-        log_every_n_steps=10
+        log_every_n_steps=10,
+        callbacks=[checkpoint_callback]
     )
 
     # Train

@@ -205,24 +205,24 @@ class MLPVQVAE(pl.LightningModule):
 
         return x_recon, vq_loss, indices
         
-    #Training Step
+    # Training Step
     def training_step(self, batch, batch_idx):
 
         x, mask = batch 
 
         x_recon, commit_loss, _ = self(x, mask)
 
-        #Reconstruction loss 
+        # Reconstruction loss 
         recon_loss = (x - x_recon) ** 2
 
-        #Apply mask
+        # Apply mask
         mask = mask.unsqueeze(-1)
         recon_loss = recon_loss * mask
 
-        #Avarage only with valid values
+        # Average only with valid values
         recon_loss = recon_loss.sum() / mask.sum()
 
-        #Total loss
+        # Total loss
         loss = recon_loss + commit_loss
 
         self.log("train_loss", loss, prog_bar=True)
@@ -231,61 +231,61 @@ class MLPVQVAE(pl.LightningModule):
 
         return loss
     
-    #Validation Step
+    # Validation Step
     def validation_step(self, batch, batch_idx):
 
         x, mask = batch
 
         x_recon, commit_loss, _ = self(x, mask)
         
-        #Reconstruction loss
+        # Reconstruction loss
         recon_loss = (x - x_recon) ** 2
 
-        #Apply mask
+        # Apply mask
         mask = mask.unsqueeze(-1)
         recon_loss = recon_loss * mask
 
-        #Average only valid values
+        # Average only valid values
         recon_loss = recon_loss.sum() / mask.sum()
         
-        #Total loss
+        # Total loss
         loss = recon_loss + commit_loss
         
-        #Log
+        # Log
         self.log("val_loss", loss, prog_bar=True)
         self.log("val_recon_loss", recon_loss, prog_bar=True)
         self.log("val_commit_loss", commit_loss, prog_bar=True)
     
 
-    #Test step
+    # Test step
     def test_step(self, batch, batch_idx):
         
         x, mask = batch
 
         x_recon, commit_loss, _ = self(x, mask)
 
-        #Reconstruction loss
+        # Reconstruction loss
         recon_loss = (x - x_recon) ** 2
 
-        #Apply mask
+        # Apply mask
         mask = mask.unsqueeze(-1)
         recon_loss = recon_loss * mask
 
-        #Average only valid values
+        # Average only valid values
         recon_loss = recon_loss.sum() / mask.sum()
 
-        #Total loss
+        # Total loss
         loss = recon_loss + commit_loss
 
-        #Log
+        # Log
         self.log("test_loss", loss, prog_bar=True)
         self.log("test_recon_loss", recon_loss, prog_bar=True)
         self.log("test_commit_loss", commit_loss, prog_bar=True)
 
-    #Optimizer
+    # Optimizer
     def configure_optimizers(self):
         
-        #Adam
+        # Adam
         return torch.optim.Adam(self.parameters(), lr=self.lr)
 
     #def encode(self, x: Tensor) -> Tensor:
