@@ -7,7 +7,7 @@ data:
   max_particles: 128
   preprocessing: True
   features: 
+    - L1T_PUPPIPart_PT
     - L1T_PUPPIPart_Eta 
     - L1T_PUPPIPart_Phi
-    - L1T_PUPPIPart_PT
     - L1T_PUPPIPart_PuppiW
