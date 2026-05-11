@@ -24,6 +24,7 @@ class L1TriggerDataset(IterableDataset):
         max_particles: int = 128,
         features: List[str] = ["L1T_PUPPIPart_PT", "L1T_PUPPIPart_Eta", "L1T_PUPPIPart_Phi", "L1T_PUPPIPart_PuppiW"],
         puppiw_threshold: float = 0.05,
+        preprocessing: bool = True
     ):
         """
         Initialize the dataset.
@@ -33,6 +34,7 @@ class L1TriggerDataset(IterableDataset):
             max_particles: Maximum number of particles per event.
             features: List of feature names to extract.
             puppiw_threshold: Minimum PUPPI weight for particles.
+            preprocessing: Whether to apply preprocessing.
         """
         super().__init__()
 
@@ -41,6 +43,7 @@ class L1TriggerDataset(IterableDataset):
         self.features = features
         self.coords = features[:-1] #Exclude PuppiW from coordinates
         self.puppiw_threshold = puppiw_threshold
+        self.preprocessing = preprocessing
 
     def _process_event(self, row: pd.Series) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -57,6 +60,19 @@ class L1TriggerDataset(IterableDataset):
         # Apply puppiw filter
         puppiw = row["L1T_PUPPIPart_PuppiW"]
         valid_mask = np.array(puppiw) >= self.puppiw_threshold
+
+        #Preprocessing 
+        if self.preprocessing:
+            # Normalize pT and eta
+            pt = np.array(row["L1T_PUPPIPart_PT"])
+            eta = np.array(row["L1T_PUPPIPart_Eta"])
+            phi = np.array(row["L1T_PUPPIPart_Phi"])
+            pt = np.log(pt + 1e-8) - 1.8  
+            eta = eta / 3
+            phi = phi / np.pi
+            row["L1T_PUPPIPart_PT"] = pt
+            row["L1T_PUPPIPart_Eta"] = eta
+            row["L1T_PUPPIPart_Phi"] = phi
 
         # Filter particles
         for feat_idx, feat_name in enumerate(self.coords):
@@ -171,7 +187,7 @@ class L1TriggerDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             pin_memory=True,
-            drop_last=True,
+            #drop_last=True,
         )
 
     def test_dataloader(self):
@@ -187,5 +203,5 @@ class L1TriggerDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             pin_memory=True,
-            drop_last=True,
+            #drop_last=True,
         )
