@@ -1,1 +1,15 @@
-# model config
+#Model configs
+
+MLP_VQVAE:
+  input_dim: 3
+  hidden_dim: 128
+  latent_dim: 256
+  codebook_size: 256
+  rotation_trick: True
+  decay: 0.8
+  beta: 0.25
+
+training:
+  lr: 0.001
+  max_epochs: 10
+  batch_size: 32
