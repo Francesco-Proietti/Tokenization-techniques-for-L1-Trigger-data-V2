@@ -73,7 +73,8 @@ def main():
         commitment_cost=beta,
         lr=lr
     )
-
+    
+    # Save only the top-3 checkpoint
     checkpoint_callback = ModelCheckpoint(
         dirpath="checkpoints/",
         filename="vqvae-{epoch:02d}-{val_loss:.4f}",
