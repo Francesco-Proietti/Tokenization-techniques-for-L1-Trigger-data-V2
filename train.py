@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Training script for MLP VQ-VAE on L1 Trigger data."""
 
-
 from pathlib import Path
 import yaml
 
@@ -12,6 +11,10 @@ from lightning.pytorch.loggers import TensorBoardLogger
 
 from src.data.data_loading import L1TriggerDataset, L1TriggerDataModule
 from src.models.mlp_vqvae import MLPVQVAE
+
+seed = 42
+
+pl.seed_everything(seed, workers=True)
 
 
 def load_config(config_path: str) -> dict:
