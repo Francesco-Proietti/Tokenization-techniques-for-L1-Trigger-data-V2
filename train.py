@@ -8,6 +8,7 @@ import yaml
 import lightning as pl
 import torch
 from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.loggers import TensorBoardLogger
 
 from src.data.data_loading import L1TriggerDataset, L1TriggerDataModule
 from src.models.mlp_vqvae import MLPVQVAE
@@ -84,13 +85,19 @@ def main():
         save_last=True       
     )
 
+    logger = TensorBoardLogger(
+        save_dir="logs",
+        name="mlp_vqvae"
+    )
+
     # Initialize trainer
     trainer = pl.Trainer(
         max_epochs=max_epochs,
         accelerator="auto",
         devices="auto",
         log_every_n_steps=10,
-        callbacks=[checkpoint_callback]
+        callbacks=[checkpoint_callback],
+        logger=logger
     )
 
     # Train

@@ -226,8 +226,8 @@ class MLPVQVAE(pl.LightningModule):
         loss = recon_loss + commit_loss
 
         self.log("train_loss", loss, prog_bar=True)
-        self.log("recon_loss", recon_loss, prog_bar=True)
-        self.log("commit_loss", commit_loss, prog_bar=True)
+        self.log("train_recon_loss", recon_loss, prog_bar=True)
+        self.log("train_commit_loss", commit_loss, prog_bar=True)
 
         return loss
     
