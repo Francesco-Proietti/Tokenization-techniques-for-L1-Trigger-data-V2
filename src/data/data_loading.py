@@ -84,7 +84,7 @@ class L1TriggerDataset(IterableDataset):
         
         return torch.FloatTensor(feats), torch.BoolTensor(mask)
 
-    def __iter__(self) -> Iterator[dict]:
+    def __iter__(self) -> Iterator[Tuple]:
         """
         Iterate over all events using pyarrow.dataset scanner.
 
@@ -126,8 +126,8 @@ class L1TriggerDataModule(pl.LightningDataModule):
     def __init__(
         self,
         parquet_dirs_train: List[str],
-        parquet_dirs_val: Optional[List[str]] = None,
-        parquet_dirs_test: Optional[List[str]] = None,
+        parquet_dirs_val: List[str],
+        parquet_dirs_test: List[str],
         max_particles: int = 128,
         batch_size: int = 32,
         num_workers: int = 0,
@@ -139,8 +139,8 @@ class L1TriggerDataModule(pl.LightningDataModule):
 
         Args:
             parquet_dirs_train: Directories containing training parquet files.
-            parquet_dirs_val: Optional directories containing validation data.
-            parquet_dirs_test: Optional directories containing test data.
+            parquet_dirs_val: Directories containing validation data.
+            parquet_dirs_test: Directories containing test data.
             max_particles: Maximum particles per event.
             batch_size: Batch size for dataloaders.
             num_workers: Workers for dataloaders.
