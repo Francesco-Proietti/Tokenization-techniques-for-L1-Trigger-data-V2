@@ -2,17 +2,23 @@ name: transformer
 
 input_dim: 3
 
-latent_dim: 256
-
-codebook_size: 512
+embedding_dim: 128
 
 n_heads: 4
 
-n_layers: 3
+mlp_ratio: 4
+
+dropout: 0.1
+
+depth: 4
+
+latent_dim: 4
+
+codebook_size: 512
 
 rotation_trick: True
 
 decay: 0.8
 
-beta: 0.25
+beta: 0.9
 

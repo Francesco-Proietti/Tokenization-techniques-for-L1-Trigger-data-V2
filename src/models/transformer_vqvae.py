@@ -15,96 +15,92 @@ from torch import Tensor
 from vector_quantize_pytorch import VectorQuantize
 
 
-class TransformerEncoder(nn.Module):
-    """Transformer Encoder for VQ-VAE."""
+# ============================================================
+# NormFormer Block
+# ============================================================
+
+class NormFormerBlock(nn.Module):
 
     def __init__(
         self,
-        input_dim: int, 
-        latent_dim: int, 
-        n_heads: int = 4, 
-        n_layers: int = 3
+        dim: int = 128,
+        num_heads: int = 8,
+        mlp_ratio: int = 4,
+        dropout: float = 0.1
     ):
-        """"
-        Initialize the Encoder.
-
-        Args:
-            input_dim: Dimension of input features.
-            latent_dim: Dimension of the latent space.
-            n_heads: Number of attention heads.
-            n_layers: Number of transformer layers.
-        """
         super().__init__()
 
-        self.input_proj = nn.Linear(input_dim, latent_dim)
+        # --------------------------------------------------
+        # Attention
+        # --------------------------------------------------
 
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=latent_dim,
-            nhead=n_heads,
+        self.norm1 = nn.LayerNorm(dim)
+
+        self.attn = nn.MultiheadAttention(
+            embed_dim=dim,
+            num_heads=num_heads,
+            dropout=dropout,
             batch_first=True
         )
 
-        self.transformer = nn.TransformerEncoder(
-            encoder_layer,
-            num_layers=n_layers
+        self.post_attn_norm = nn.LayerNorm(dim)
+
+        # --------------------------------------------------
+        # FeedForward
+        # --------------------------------------------------
+
+        self.norm2 = nn.LayerNorm(dim)
+
+        hidden_dim = dim * mlp_ratio
+
+        self.ff = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim)
         )
 
-    def forward(self, x: Tensor, mask: Tensor) -> Tensor:
-        """Forward pass through encoder."""
-        
-        x = self.input_proj(x)  
+        self.post_ff_norm = nn.LayerNorm(dim)
 
-        #mask (invert True-False)
-        attn_mask = ~mask 
+    def forward(self, x, mask):
 
-        z = self.transformer(x, src_key_padding_mask=attn_mask)
+        # --------------------------------------------------
+        # Attention block
+        # --------------------------------------------------
 
-        return z
-    
+        residual = x
 
-class TransformerDecoder(nn.Module):
-    """Transformer Decoder for VQ-VAE."""
+        x_norm = self.norm1(x)
 
-    def __init__(
-        self, 
-        latent_dim: int, 
-        output_dim: int, 
-        n_heads: int = 4, 
-        n_layers: int = 3
-    ):
-        """
-        Initialize the Decoder.
+        key_padding_mask = ~mask
 
-        Args:
-            latent_dim: Dimension of the latent embedding.
-            n_heads: Number of attention heads.
-            n_layers: Number of transformer layers.
-            output_dim: Dimension of reconstructed output.
-        """
-        super().__init__()
-
-        decoder_layer = nn.TransformerEncoderLayer(
-            d_model=latent_dim,
-            nhead=n_heads,
-            batch_first=True
+        attn_out, _ = self.attn(
+            x_norm,
+            x_norm,
+            x_norm,
+            key_padding_mask=key_padding_mask,
+            need_weights=False
         )
 
-        self.transformer = nn.TransformerEncoder(
-            decoder_layer,
-            num_layers=n_layers
-        )
+        attn_out = self.post_attn_norm(attn_out)
 
-        self.output_proj = nn.Linear(latent_dim, output_dim)
+        x = residual + attn_out
 
-    def forward(self, z: Tensor, mask: Tensor) -> Tensor:
-        """Forward pass through decoder."""
-        attn_mask = ~mask
+        # --------------------------------------------------
+        # FeedForward block
+        # --------------------------------------------------
 
-        z = self.transformer(z, src_key_padding_mask=attn_mask)
-        x_recon = self.output_proj(z)
+        residual = x
 
-        return x_recon
-    
+        x_norm = self.norm2(x)
+
+        ff_out = self.ff(x_norm)
+
+        ff_out = self.post_ff_norm(ff_out)
+
+        x = residual + ff_out
+
+        return x
 
 class TransformerVQVAE(pl.LightningModule):
     """Transformer Vector Quantized Variational Autoencoder."""
@@ -134,17 +130,35 @@ class TransformerVQVAE(pl.LightningModule):
         self.save_hyperparameters()
 
         self.input_dim = cfg.input_dim
+        self.embedding_dim = cfg.embedding_dim
+        self.n_heads = cfg.n_heads
+        self.mlp_ratio = cfg.mlp_ratio
+        self.dropout = cfg.dropout
+        self.depth = cfg.depth
         self.latent_dim = cfg.latent_dim
         self.codebook_size = cfg.codebook_size
-        self.n_heads = cfg.n_heads
         self.n_layers = cfg.n_layers
         self.decay = cfg.decay
         self.beta = cfg.beta
         self.rot_trick = cfg.rotation_trick
         self.lr = lr
         
-        #Encoder
-        self.encoder = TransformerEncoder(self.input_dim, self.latent_dim, self.n_heads, self.n_layers)
+        # Input projection
+        self.input_proj = nn.Linear(self.input_dim, self.embedding_dim)
+
+        # Encoder
+        self.encoder = nn.ModuleList([
+            NormFormerBlock(
+                dim=self.embedding_dim, 
+                num_heads=self.n_heads, 
+                mlp_ratio=self.mlp_ratio,
+                dropout=self.dropout
+            )
+            for _ in range(self.depth)              
+        ])
+
+        # Pre-VQ projection
+        self.to_quant = nn.Linear(self.embedding_dim, self.latent_dim)
 
         self.quantizer = VectorQuantize(
             dim=self.latent_dim,
@@ -154,10 +168,22 @@ class TransformerVQVAE(pl.LightningModule):
             rotation_trick=self.rot_trick
         )
         
-        #Decoder (not a "real" transformer decoder)
-        self.decoder = TransformerDecoder(self.latent_dim, self.input_dim, self.n_heads, self.n_layers)
-
+        # Post-VQ projection
+        self.from_quant = nn.Linear(self.latent_dim, self.embedding_dim)
         
+        # Decoder 
+        self.decoder = nn.ModuleList([
+            NormFormerBlock(
+                dim=self.embedding_dim,
+                num_heads=self.n_heads,
+                mlp_ratio=self.mlp_ratio,
+                dropout=self.dropout
+            )
+            for _ in range(self.depth)
+        ])
+        
+        # Output projection
+        self.output_proj = nn.Linear(self.embedding_dim, self.input_dim)
 
     def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         
@@ -173,9 +199,18 @@ class TransformerVQVAE(pl.LightningModule):
             indices: Indices of the quantized vectors
         """
         
-        # Encode
-        z_e = self.encoder(x, mask)  
+        B, N, F = x.shape
+        
+        # Input projection
+        x = self.input_proj(x)
 
+        # Encode
+        for block in self.encoder:
+            x = block(x, mask)
+        
+        # Pre-VQ projection
+        z_e = self.to_quant(x) 
+        
         B, N, D = z_e.size()
 
         z_e_flat = z_e.view(B*N, D)
@@ -186,11 +221,20 @@ class TransformerVQVAE(pl.LightningModule):
         # Quantize
         z_q, indices, vq_loss = self.quantizer(z_e_valid)
 
-        z_q_all = torch.zeros(B, N, D, device=x.device)
-        z_q_all[mask] = z_q
+        z_q_flat = torch.zeros(B*N, D, device=x.device)
+        z_q_flat[mask_flat] = z_q
+
+        z_q = z_q_flat.view(B, N, D)
+        
+        # Post-VQ projection
+        x = self.from_quant(z_q)
 
         # Decode
-        x_recon = self.decoder(z_q_all, mask)
+        for block in self.decoder:
+            x = block(x, mask)
+
+        # Final output projection
+        x_recon = self.output_proj(x)
 
         return x_recon, vq_loss, indices
     
@@ -211,7 +255,7 @@ class TransformerVQVAE(pl.LightningModule):
         recon_loss = recon_loss.sum() / mask.sum()
 
         # Total loss
-        loss = recon_loss + commit_loss
+        loss = recon_loss + 10 * commit_loss
 
         self.log("train_loss", loss, prog_bar=True)
         self.log("train_recon_loss", recon_loss, prog_bar=True)
@@ -237,7 +281,7 @@ class TransformerVQVAE(pl.LightningModule):
         recon_loss = recon_loss.sum() / mask.sum()
         
         # Total loss
-        loss = recon_loss + commit_loss
+        loss = recon_loss + 10 * commit_loss
         
         #Log
         self.log("val_loss", loss, prog_bar=True)
@@ -262,7 +306,7 @@ class TransformerVQVAE(pl.LightningModule):
         recon_loss = recon_loss.sum() / mask.sum()
 
         # Total loss
-        loss = recon_loss + commit_loss
+        loss = recon_loss + 10 *commit_loss
 
         # Log
         self.log("test_loss", loss, prog_bar=True)
