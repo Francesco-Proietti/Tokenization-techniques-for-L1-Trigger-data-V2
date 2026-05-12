@@ -111,14 +111,7 @@ class TransformerVQVAE(pl.LightningModule):
 
     def __init__(
         self,
-        input_dim: int = 3, 
-        latent_dim: int = 128, 
-        codebook_size: int = 256, 
-        n_heads: int = 4, 
-        n_layers: int = 3, 
-        dec: float = 0.8, 
-        beta: float = 0.25, 
-        rot_trick: bool = True, 
+        cfg,
         lr: float = 1e-3
     ):
         """
@@ -140,14 +133,14 @@ class TransformerVQVAE(pl.LightningModule):
 
         self.save_hyperparameters()
 
-        self.input_dim = input_dim
-        self.latent_dim = latent_dim
-        self.codebook_size = codebook_size
-        self.n_heads = n_heads
-        self.n_layers = n_layers
-        self.decay = dec
-        self.beta = beta
-        self.rot_trick = rot_trick
+        self.input_dim = cfg.input_dim
+        self.latent_dim = cfg.latent_dim
+        self.codebook_size = cfg.codebook_size
+        self.n_heads = cfg.n_heads
+        self.n_layers = cfg.n_layers
+        self.decay = cfg.decay
+        self.beta = cfg.beta
+        self.rot_trick = cfg.rotation_trick
         self.lr = lr
         
         #Encoder

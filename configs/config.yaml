@@ -1,5 +1,5 @@
 defaults:
-  - model: mlp_vqvae
+  - model: transformer_vqvae
   - data: default
   - trainer: default
 
