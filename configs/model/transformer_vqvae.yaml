@@ -2,11 +2,9 @@ name: transformer
 
 input_dim: 3
 
-embedding_dim: 128
+hidden_dim: 128
 
 n_heads: 4
-
-mlp_ratio: 4
 
 dropout: 0.1
 
