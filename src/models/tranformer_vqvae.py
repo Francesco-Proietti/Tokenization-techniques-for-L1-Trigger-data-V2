@@ -103,7 +103,7 @@ class TransformerDecoder(nn.Module):
         return x_recon
     
 
-class VQVAE_Transformer(pl.LightningModule):
+class TransformerVQVAE(pl.LightningModule):
     """Transformer Vector Quantized Variational Autoencoder."""
 
     def __init__(
