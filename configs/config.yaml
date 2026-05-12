@@ -1,0 +1,11 @@
+defaults:
+  - model: mlp_vqvae
+  - data: default
+  - trainer: default
+
+experiment:
+  name: ${model.name}
+
+paths:
+  logs_dir: logs
+  checkpoint_dir: checkpoints

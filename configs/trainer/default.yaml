@@ -1,0 +1,13 @@
+max_epochs: 10
+
+batch_size: 32
+
+lr: 1e-3
+
+accelerator: auto
+
+devices: auto
+
+log_every_n_steps: 10
+
+seed: 42
