@@ -216,7 +216,7 @@ class MLPVQVAE(pl.LightningModule):
         recon_loss = recon_loss.sum() / mask.sum()
 
         # Total loss
-        loss = recon_loss + commit_loss
+        loss = recon_loss + 10 * commit_loss
 
         self.log("train_loss", loss, prog_bar=True)
         self.log("train_recon_loss", recon_loss, prog_bar=True)
@@ -242,7 +242,7 @@ class MLPVQVAE(pl.LightningModule):
         recon_loss = recon_loss.sum() / mask.sum()
         
         # Total loss
-        loss = recon_loss + commit_loss
+        loss = recon_loss + 10 * commit_loss
         
         # Log
         self.log("val_loss", loss, prog_bar=True)
@@ -268,7 +268,7 @@ class MLPVQVAE(pl.LightningModule):
         recon_loss = recon_loss.sum() / mask.sum()
 
         # Total loss
-        loss = recon_loss + commit_loss
+        loss = recon_loss + 10 * commit_loss
 
         # Log
         self.log("test_loss", loss, prog_bar=True)

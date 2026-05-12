@@ -145,9 +145,6 @@ class TransformerVQVAE(pl.LightningModule):
         
         #Encoder
         self.encoder = TransformerEncoder(self.input_dim, self.latent_dim, self.n_heads, self.n_layers)
-        
-        #Decoder (not a "real" transformer decoder)
-        self.decoder = TransformerDecoder(self.latent_dim, self.input_dim, self.n_heads, self.n_layers)
 
         self.quantizer = VectorQuantize(
             dim=self.latent_dim,
@@ -156,6 +153,11 @@ class TransformerVQVAE(pl.LightningModule):
             commitment_weight=self.beta,
             rotation_trick=self.rot_trick
         )
+        
+        #Decoder (not a "real" transformer decoder)
+        self.decoder = TransformerDecoder(self.latent_dim, self.input_dim, self.n_heads, self.n_layers)
+
+        
 
     def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         
@@ -173,12 +175,22 @@ class TransformerVQVAE(pl.LightningModule):
         
         # Encode
         z_e = self.encoder(x, mask)  
+
+        B, N, D = z_e.size()
+
+        z_e_flat = z_e.view(B*N, D)
+        mask_flat = mask.view(B*N)
+        
+        z_e_valid = z_e_flat[mask_flat]
         
         # Quantize
-        z_q, indices, vq_loss = self.quantizer(z_e)
-        
+        z_q, indices, vq_loss = self.quantizer(z_e_valid)
+
+        z_q_all = torch.zeros(B, N, D, device=x.device)
+        z_q_all[mask] = z_q
+
         # Decode
-        x_recon = self.decoder(z_q, mask)
+        x_recon = self.decoder(z_q_all, mask)
 
         return x_recon, vq_loss, indices
     
