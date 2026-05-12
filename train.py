@@ -10,6 +10,8 @@ import torch
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
 
+from src.models.registry import MODEL_REGISTRY
+
 from src.data.data_loading import L1TriggerDataModule
 from src.models.mlp_vqvae import MLPVQVAE
 
@@ -42,16 +44,10 @@ def main(cfg: DictConfig):
     # Model
     # -----------------------
 
-    model = MLPVQVAE(
-        input_dim=cfg.model.input_dim,
-        hidden_dims=cfg.model.hidden_dims,
-        embedding_dim=cfg.model.latent_dim,
-        num_embeddings=cfg.model.codebook_size,
-        decay=cfg.model.decay,
-        rot_trick=cfg.model.rotation_trick,
-        commitment_cost=cfg.model.beta,
-        lr=cfg.trainer.lr
-    )
+    model_name = cfg.model.name
+    ModelClass = MODEL_REGISTRY[model_name]
+
+    model = ModelClass(cfg.model, lr=cfg.trainer.lr)
 
     # -----------------------
     # Logger

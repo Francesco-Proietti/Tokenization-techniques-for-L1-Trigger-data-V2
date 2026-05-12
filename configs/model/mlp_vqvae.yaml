@@ -1,4 +1,4 @@
-name: mlp_vqvae
+name: mlp
 
 input_dim: 3
 
@@ -16,3 +16,8 @@ decay: 0.8
 
 beta: 0.25
 
+reconstruction_weight: 1.0
+
+encoder_hidden_dims: 
+
+decoder_hidden_dims: 

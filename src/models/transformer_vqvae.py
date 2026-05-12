@@ -4,10 +4,13 @@ Transformer VQ-VAE Implementation
 A Vector Quantized Variational Autoencoder with Transformer encoder/decoder.
 """
 
+from typing import List, Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import lightning as pl
+from torch import Tensor
 
 from vector_quantize_pytorch import VectorQuantize
 

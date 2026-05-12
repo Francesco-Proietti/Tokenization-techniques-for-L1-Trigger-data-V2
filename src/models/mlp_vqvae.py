@@ -111,16 +111,7 @@ class MLPVQVAE(pl.LightningModule):
 
     def __init__(
         self,
-        input_dim: int,
-        hidden_dims: List[int],
-        decay: float,
-        embedding_dim: int = 64,
-        num_embeddings: int = 512,
-        rot_trick: bool = True,
-        commitment_cost: float = 0.25,
-        reconstruction_weight: float = 1.0,
-        encoder_hidden_dims: Optional[List[int]] = None,
-        decoder_hidden_dims: Optional[List[int]] = None,
+        cfg,
         lr: float = 1e-3
     ):
         """
@@ -140,18 +131,19 @@ class MLPVQVAE(pl.LightningModule):
 
         self.save_hyperparameters()
 
-        self.input_dim = input_dim
-        self.embedding_dim = embedding_dim
-        self.num_embeddings = num_embeddings
-        self.rot_trick = rot_trick
-        self.decay = decay
-        self.beta = commitment_cost
-        self.reconstruction_weight = reconstruction_weight
+        self.input_dim = cfg.input_dim
+        self.hidden_dims = cfg.hidden_dims
+        self.embedding_dim = cfg.latent_dim
+        self.num_embeddings = cfg.codebook_size
+        self.rot_trick = cfg.rotation_trick
+        self.decay = cfg.decay
+        self.beta = cfg.beta
+        self.reconstruction_weight = cfg.reconstruction_weight
         self.lr = lr
 
-        self.encoder_hidden_dims = encoder_hidden_dims or hidden_dims
-        self.decoder_hidden_dims = decoder_hidden_dims or list(reversed(hidden_dims))
-        
+        self.encoder_hidden_dims = cfg.encoder_hidden_dims or self.hidden_dims
+        self.decoder_hidden_dims = cfg.decoder_hidden_dims or list(reversed(self.hidden_dims))
+
         self.encoder = MLPEncoder(
             input_dim=self.input_dim,
             hidden_dims=self.encoder_hidden_dims,
