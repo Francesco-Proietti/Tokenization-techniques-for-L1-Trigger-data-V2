@@ -173,7 +173,7 @@ class MLPVQVAE(pl.LightningModule):
             output_dim=self.input_dim
         )
 
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, dict]:
+    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         """
         Forward pass through the VQ-VAE.
 
@@ -182,7 +182,8 @@ class MLPVQVAE(pl.LightningModule):
             mask: Boolean tensor indicating valid particles [batch_size, num_particles]
         Returns:
             reconstruction: Reconstructed input
-            losses: Dictionary of loss components
+            commitment_loss: Commitment loss
+            indices: Indices of the quantized vectors
         """
         
         B, N, F = x.size()
