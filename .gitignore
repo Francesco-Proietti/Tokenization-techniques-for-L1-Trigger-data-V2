@@ -225,3 +225,6 @@ checkpoints/
 
 # TensorBoard logs
 logs/
+
+# Hydra output
+outputs/
