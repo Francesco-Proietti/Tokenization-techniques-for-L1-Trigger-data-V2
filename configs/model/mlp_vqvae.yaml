@@ -11,7 +11,7 @@ latent_dim: 4
 
 codebook_size: 512
 
-rotation_trick: True
+rotation_trick: False
 
 decay: 0.8
 
