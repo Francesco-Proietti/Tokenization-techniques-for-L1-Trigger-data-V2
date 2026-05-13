@@ -22,7 +22,7 @@ class MLPEncoder(nn.Module):
         self,
         input_dim: int,
         hidden_dims: List[int],
-        embedding_dim: int,
+        latent_dim: int,
     ):
         """
         Initialize the Encoder.
@@ -30,7 +30,7 @@ class MLPEncoder(nn.Module):
         Args:
             input_dim: Dimension of input features.
             hidden_dims: List of hidden layer dimensions.
-            embedding_dim: Dimension of the embedding space (output).
+            latent_dim: Dimension of the latent space (output).
         """
         super().__init__()
 
@@ -45,18 +45,13 @@ class MLPEncoder(nn.Module):
             prev_dim = hidden_dim
 
         self.encoder = nn.Sequential(*layers)
-        self.projector = nn.Linear(prev_dim, embedding_dim)
+        self.projector = nn.Linear(prev_dim, latent_dim)
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass through encoder."""
-        # If input has more than 2 dimensions, flatten except batch dim
-        if x.dim() > 2:
-            batch_size = x.size(0)
-            num_part = x.size(1)
-            num_features = x.size(2)
-            x = x.view(batch_size*num_part, num_features)
-
+        
         h = self.encoder(x)
+
         return self.projector(h)
 
 
@@ -65,23 +60,22 @@ class MLPDecoder(nn.Module):
 
     def __init__(
         self,
-        embedding_dim: int,
+        latent_dim: int,
         hidden_dims: List[int],
         output_dim: int,
-        dropout: float = 0.1,
     ):
         """
         Initialize the Decoder.
 
         Args:
-            embedding_dim: Dimension of the latent embedding.
+            latent_dim: Dimension of the latent space.
             hidden_dims: List of hidden layer dimensions.
             output_dim: Dimension of reconstructed output.
         """
         super().__init__()
 
         layers = []
-        prev_dim = embedding_dim
+        prev_dim = latent_dim
 
         for hidden_dim in hidden_dims:
             layers.extend([
@@ -95,12 +89,6 @@ class MLPDecoder(nn.Module):
 
     def forward(self, z: Tensor) -> Tensor:
         """Forward pass through decoder."""
-        # If input has more than 2 dimensions, flatten except batch dim
-        if z.dim() > 2:
-            batch_size = z.size(0)
-            num_part = z.size(1)
-            num_features = z.size(2)
-            z = z.view(batch_size*num_part, num_features)
 
         h = self.decoder(z)
         return self.reconstructor(h)
@@ -120,8 +108,8 @@ class MLPVQVAE(pl.LightningModule):
         Args:
             input_dim: Dimension of input features.
             hidden_dims: Shared hidden dimensions for encoder/decoder.
-            embedding_dim: Dimension of the embedding space.
-            num_embeddings: Number of codebook vectors.
+            latent_dim: Dimension of the latent space.
+            codebook_size: Number of codebook vectors.
             commitment_cost: Weight for commitment loss.
             reconstruction_weight: Weight for reconstruction loss.
             encoder_hidden_dims: Optional custom hidden dims for encoder (overrides hidden_dims).
@@ -133,12 +121,11 @@ class MLPVQVAE(pl.LightningModule):
 
         self.input_dim = cfg.input_dim
         self.hidden_dims = cfg.hidden_dims
-        self.embedding_dim = cfg.latent_dim
-        self.num_embeddings = cfg.codebook_size
+        self.latent_dim = cfg.latent_dim
+        self.codebook_size = cfg.codebook_size
         self.rot_trick = cfg.rotation_trick
         self.decay = cfg.decay
         self.beta = cfg.beta
-        self.reconstruction_weight = cfg.reconstruction_weight
         self.lr = lr
 
         self.encoder_hidden_dims = cfg.encoder_hidden_dims or self.hidden_dims
@@ -147,20 +134,20 @@ class MLPVQVAE(pl.LightningModule):
         self.encoder = MLPEncoder(
             input_dim=self.input_dim,
             hidden_dims=self.encoder_hidden_dims,
-            embedding_dim=self.embedding_dim
+            latent_dim=self.latent_dim
         )
 
         # Vector Quantizer
         self.quantizer = VectorQuantize(
-            dim=self.embedding_dim,
-            codebook_size=self.num_embeddings,
+            dim=self.latent_dim,
+            codebook_size=self.codebook_size,
             rotation_trick=self.rot_trick,
             commitment_weight=self.beta,
             decay=self.decay
         )
 
         self.decoder = MLPDecoder(
-            embedding_dim=self.embedding_dim,
+            latent_dim=self.latent_dim,
             hidden_dims=self.decoder_hidden_dims,
             output_dim=self.input_dim
         )
@@ -180,23 +167,35 @@ class MLPVQVAE(pl.LightningModule):
         
         B, N, F = x.size()
 
-        # Mask valid particles
-        x_valid = x[mask]    
-
         # Encode
-        z_e = self.encoder(x_valid)
+        z_e = self.encoder(x)
+
+        # Flatten mask
+        flat_mask = mask.view(-1) # [B*N]
+
+        flat_z_e = z_e.view(-1, self.latent_dim) # [B*N, latent_dim]
+        
+        valid_z_e = flat_z_e[flat_mask]
+
+        valid_z_e_3d = valid_z_e.unsqueeze(0) 
 
         # Quantize
-        z_q, indices, vq_loss = self.quantizer(z_e)
+        z_q, indices, commit_loss = self.quantizer(valid_z_e_3d)
+
+        z_q_valid = z_q.squeeze(0) 
+
+        z_q_padded = torch.zeros_like(flat_z_e)
+
+        z_q_padded[flat_mask] = z_q_valid
+
+        z_q = z_q_padded.view(B, N, -1)
 
         # Decode
-        x_recon_valid = self.decoder(z_q)
+        x_recon = self.decoder(z_q) 
 
-        x_recon = torch.zeros(B, N, F, device=x.device)
+        x_recon = x_recon * mask.unsqueeze(-1)
 
-        x_recon[mask] = x_recon_valid    
-
-        return x_recon, vq_loss, indices
+        return x_recon, commit_loss, indices
         
     # Training Step
     def training_step(self, batch, batch_idx):
@@ -217,7 +216,8 @@ class MLPVQVAE(pl.LightningModule):
 
         # Total loss
         loss = recon_loss + 10 * commit_loss
-
+        
+        # Log
         self.log("train_loss", loss, prog_bar=True)
         self.log("train_recon_loss", recon_loss, prog_bar=True)
         self.log("train_commit_loss", commit_loss, prog_bar=True)
@@ -280,17 +280,3 @@ class MLPVQVAE(pl.LightningModule):
         
         # Adam
         return torch.optim.Adam(self.parameters(), lr=self.lr)
-
-    #def encode(self, x: Tensor) -> Tensor:
-    #    """Encode input to latent representation."""
-    #    z_e = self.encoder(x)
-    #    _, _, _ = self.quantizer(z_e)  # Forward to get quantized
-    #    return z_e
-
-    #def decode(self, z_q: Tensor) -> Tensor:
-    #    """Decode latent representation to reconstruction."""
-    #    return self.decoder(z_q)
-
-    #def generate(self, x: Tensor) -> Tensor:
-    #    """Generate reconstruction of input."""
-    #    return self.forward(x)[0]

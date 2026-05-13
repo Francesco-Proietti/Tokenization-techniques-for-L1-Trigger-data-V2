@@ -17,8 +17,6 @@ decay: 0.8
 
 beta: 0.9
 
-reconstruction_weight: 1.0
-
 encoder_hidden_dims: 
 
 decoder_hidden_dims: 
