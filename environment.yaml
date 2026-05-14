@@ -1,0 +1,16 @@
+name: Token-L1-data
+channels:
+  - defaults
+dependencies:
+  - python=3.13
+  - matplotlib
+  - pandas
+  - scikit-learn
+  - numpy
+  - ipykernel
+  - pyarrow
+  - plotly
+  - nbformat
+  - tensorboard
+  - tensorflow
+
